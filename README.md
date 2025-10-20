@@ -57,8 +57,8 @@
                     <label for="host-list" class="block text-sm font-medium text-gray-700 mb-2">
                         Hosts/IPs to Monitor (One per line)
                     </label>
-                    <textarea id="host-list" rows="5" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-secondary focus:border-secondary transition duration-150" placeholder="e.g., 192.168.1.1&#10;google.com&#10;server-app.local">129.18.100.19
-192.168.1.1
+                    <textarea id="host-list" rows="5" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-secondary focus:border-secondary transition duration-150" placeholder="e.g., 192.168.1.1&#10;google.com&#10;server-app.local">192.18.100.30
+192.168.100.19
 google.com
 github.com
 local-server

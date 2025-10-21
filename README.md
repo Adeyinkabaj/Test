@@ -60,6 +60,7 @@
                     <textarea id="host-list" rows="5" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-secondary focus:border-secondary transition duration-150" placeholder="e.g., 192.168.1.1&#10;google.com&#10;server-app.local">192.168.100.30
 192.168.100.19
 google.com
+mainstreetcapltd.com
 github.com
 local-server
 </textarea>

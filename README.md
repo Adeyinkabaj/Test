@@ -134,7 +134,8 @@ local-server
             // Function to run the actual check using an Image object
             const runImageCheck = (scheme, h) => {
                 return new Promise(resolve => {
-                    const timeout = 3000; // 3 seconds timeout
+                    // Increased timeout from 3000ms to 5000ms for potentially slower public servers.
+                    const timeout = 5000; 
                     const img = new Image();
                     let timer = null;
 
@@ -147,7 +148,8 @@ local-server
                     const start = performance.now();
 
                     timer = setTimeout(() => {
-                        cleanup('Timeout', performance.now() - start, 'Timed out');
+                        // Mark as Timeout if the image hasn't loaded or errored after 5 seconds.
+                        cleanup('Timeout', performance.now() - start, 'Timed out (5s)');
                     }, timeout);
 
                     img.onload = () => {
@@ -155,6 +157,7 @@ local-server
                     };
 
                     img.onerror = () => {
+                        // Generic onerror, often due to CORS or connection refusal.
                         cleanup('Offline', performance.now() - start, 'Connection error/Refused');
                     };
 
@@ -171,11 +174,12 @@ local-server
                     if (httpsResult.status === 'Online') {
                         return { host: host, ...httpsResult };
                     }
-                    // HTTPS failed, try HTTP
+                    // If HTTPS failed (Offline or Timeout), try HTTP
                     return runImageCheck('http', hostOnly)
                         .then(httpResult => {
                             // Return whichever result is best
                             const status = httpResult.status === 'Online' ? 'Online' : 'Offline';
+                            // Update error message to clearly state both protocols failed if they did
                             const errorMsg = httpResult.status === 'Online' ? '' : `Failed HTTPS & HTTP: ${httpResult.errorMsg}`;
                             return { host: host, status, time: httpResult.time, errorMsg, scheme: httpResult.scheme };
                         });

@@ -63,6 +63,7 @@ google.com
 mainstreetcapltd.com
 github.com
 local-server
+horilla.com
 </textarea>
                 </div>
                 <!-- Controls -->

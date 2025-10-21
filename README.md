@@ -46,6 +46,7 @@
         <header class="bg-primary text-white p-6 rounded-xl shadow-lg mb-8">
             <h1 class="text-3xl font-bold">🌐 Web Network Monitor</h1>
             <p class="text-indigo-200 mt-1">Real-time status check for Hosts/IPs without the command line.</p>
+            <p class="text-xs text-indigo-300 mt-2">Note: This monitor checks for **web connectivity (HTTP/S response)**, not a pure ICMP ping, due to browser security restrictions.</p>
         </header>
 
         <!-- Input and Control Panel -->
@@ -128,49 +129,60 @@ local-server
             logElement.scrollTop = logElement.scrollHeight;
         }
 
-        // The core pinging function using an image request (a common, simple browser method)
+        // The core pinging function, now using a promise chain to try HTTPS then HTTP
         function checkHost(host) {
-            return new Promise(resolve => {
-                // A common technique: Try to load a tiny resource (like an image) from the host on a common port (80 or 443).
-                // Note: The browser's Same-Origin Policy will often block the loading, but the failure/success of the request
-                // still provides a basic connectivity clue. True ICMP ping is not possible from client-side JS.
-                const timeout = 3000; // 3 seconds timeout
+            // Function to run the actual check using an Image object
+            const runImageCheck = (scheme, h) => {
+                return new Promise(resolve => {
+                    const timeout = 3000; // 3 seconds timeout
+                    const img = new Image();
+                    let timer = null;
 
-                // We try an HTTPS connection as it's the standard.
-                const img = new Image();
-                let timer = null;
+                    const cleanup = (status, time, errorMsg = '') => {
+                        clearTimeout(timer);
+                        img.onload = img.onerror = null; 
+                        resolve({ status, time, errorMsg, scheme });
+                    };
 
-                const cleanup = (status, time, errorMsg = '') => {
-                    clearTimeout(timer);
-                    img.onload = img.onerror = null; // Prevent memory leaks/duplicate calls
-                    resolve({ host, status, time, errorMsg });
-                };
+                    const start = performance.now();
 
-                const start = performance.now();
+                    timer = setTimeout(() => {
+                        cleanup('Timeout', performance.now() - start, 'Timed out');
+                    }, timeout);
 
-                // Set a timeout to resolve 'Offline' if the image load takes too long
-                timer = setTimeout(() => {
-                    cleanup('Offline', performance.now() - start, 'Timed out');
-                }, timeout);
+                    img.onload = () => {
+                        cleanup('Online', performance.now() - start);
+                    };
 
-                img.onload = () => {
-                    cleanup('Online', performance.now() - start);
-                };
+                    img.onerror = () => {
+                        cleanup('Offline', performance.now() - start, 'Connection error/Refused');
+                    };
 
-                img.onerror = () => {
-                    // onerror might fire for connection refused, DNS fail, or CORS issues.
-                    // We treat a quick failure as 'Offline' in this context.
-                    cleanup('Offline', performance.now() - start, 'Connection error/Refused');
-                };
+                    // Try to load a tiny resource to check for connectivity
+                    img.src = `${scheme}://${h}/favicon.ico?_r=${Math.random()}`; 
+                });
+            };
 
-                // Use the host/IP directly. This relies on the browser trying to resolve and connect.
-                // We append a random query parameter to prevent caching.
-                img.src = `https://${host}/favicon.ico?_r=${Math.random()}`; 
-                
-                // Fallback attempt for HTTP (less secure, but sometimes necessary for local devices)
-                // If the HTTPS check fails, we could potentially retry with HTTP, but for simplicity, 
-                // we rely on the primary attempt.
-            });
+            // Main execution flow: try HTTPS, then try HTTP if HTTPS fails
+            const hostOnly = host.includes(':') ? host.split(':')[0] : host;
+
+            return runImageCheck('https', hostOnly)
+                .then(httpsResult => {
+                    if (httpsResult.status === 'Online') {
+                        return { host: host, ...httpsResult };
+                    }
+                    // HTTPS failed, try HTTP
+                    return runImageCheck('http', hostOnly)
+                        .then(httpResult => {
+                            // Return whichever result is best
+                            const status = httpResult.status === 'Online' ? 'Online' : 'Offline';
+                            const errorMsg = httpResult.status === 'Online' ? '' : `Failed HTTPS & HTTP: ${httpResult.errorMsg}`;
+                            return { host: host, status, time: httpResult.time, errorMsg, scheme: httpResult.scheme };
+                        });
+                })
+                .catch(err => {
+                    return { host: host, status: 'Error', time: 0, errorMsg: `Fatal JS Error: ${err.message}`, scheme: 'N/A' };
+                });
         }
 
         // Function to process all hosts
@@ -187,59 +199,45 @@ local-server
             log(`Starting check for ${hosts.length} hosts...`);
 
             const promises = hosts.map(host => checkHost(host));
-            const results = await Promise.allSettled(promises);
+            const results = await Promise.all(promises);
 
             const now = new Date().toLocaleTimeString();
 
             results.forEach(result => {
-                if (result.status === 'fulfilled') {
-                    const { host, status, time, errorMsg } = result.value;
-                    updateStatusTable(host, status, time, now, errorMsg);
-                    log(`Checked ${host}: <span class="font-bold text-${status === 'Online' ? 'success' : 'danger'}-700">${status}</span> in ${time.toFixed(2)}ms`);
-                } else {
-                    // Handle promise rejection (shouldn't happen with the current checkHost implementation)
-                    updateStatusTable(host, 'Error', 0, now, 'Promise Rejected');
-                    log(`Checked ${host}: <span class="font-bold text-danger-700">Error</span> (Promise Rejected)`);
-                }
+                const { host, status, time, errorMsg, scheme } = result;
+                updateStatusTable(host, status, time, now, errorMsg, scheme);
+                
+                const detail = status === 'Online' ? `via ${scheme.toUpperCase()} in ${time.toFixed(2)}ms` : errorMsg;
+                log(`Checked ${host}: <span class="font-bold text-${status === 'Online' ? 'success' : 'danger'}-700">${status}</span> (${detail})`);
             });
             log(`Check cycle completed at ${now}.`, false);
         }
 
-        function updateStatusTable(host, status, time, timestamp, errorMsg) {
+        function updateStatusTable(host, status, time, timestamp, errorMsg, scheme) {
             let row = document.getElementById(`row-${host}`);
             const isOnline = status === 'Online';
             const statusColor = isOnline ? 'bg-success text-white' : 'bg-danger text-white';
             const icon = isOnline ? '✅' : '❌';
-            const detailText = isOnline ? `${time.toFixed(0)} ms` : errorMsg;
+            const detailText = isOnline ? `${time.toFixed(0)} ms (${scheme.toUpperCase()})` : errorMsg;
             const rowClass = isOnline ? 'hover:bg-green-50' : 'hover:bg-red-50';
 
             if (!row) {
                 row = statusBody.insertRow();
                 row.id = `row-${host}`;
                 row.className = `transition duration-150 ease-in-out ${rowClass}`;
-                row.innerHTML = `
-                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${host}</td>
-                    <td id="status-cell-${host}" class="px-6 py-4 whitespace-nowrap text-center">
-                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusColor}">${icon} ${status}</span>
-                        <div class="text-xs text-gray-500 mt-1">${detailText}</div>
-                    </td>
-                    <td id="time-cell-${host}" class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">${timestamp}</td>
-                `;
-                // If a new row is added, we don't clear the statusBody inside runCheck anymore, 
-                // so we need to ensure the new row is sorted (or just let the user see it append).
-                // Given the current structure, let's keep the row append simple.
+                // Insert placeholders for cells and update content below
             } else {
-                // Update existing row
-                const statusCell = document.getElementById(`status-cell-${host}`);
-                const timeCell = document.getElementById(`time-cell-${host}`);
+                row.className = `transition duration-150 ease-in-out ${rowClass}`;
+            }
 
-                statusCell.innerHTML = `
+            row.innerHTML = `
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${host}</td>
+                <td id="status-cell-${host}" class="px-6 py-4 whitespace-nowrap text-center">
                     <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusColor}">${icon} ${status}</span>
                     <div class="text-xs text-gray-500 mt-1">${detailText}</div>
-                `;
-                timeCell.textContent = timestamp;
-                row.className = `transition duration-150 ease-in-out ${rowClass}`; // Update hover effect
-            }
+                </td>
+                <td id="time-cell-${host}" class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">${timestamp}</td>
+            `;
         }
 
         // Start/Stop Logic
@@ -275,4 +273,3 @@ local-server
     </script>
 </body>
 </html>
-

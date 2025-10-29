@@ -63,7 +63,7 @@ google.com
 mainstreetcapltd.sharepoint.com
 mainstreetcapltd.com
 mail.google.com
-mail.ubagroup.com
+mail.ubagroup.com/owa
 mybankone.com
 github.com
 local-server

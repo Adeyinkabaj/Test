@@ -62,6 +62,8 @@
 google.com
 mainstreetcapltd.sharepoint.com
 mainstreetcapltd.com
+mail.google.com
+mail.ubagroup.com
 mybankone.com
 github.com
 local-server

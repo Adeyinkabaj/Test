@@ -41,7 +41,7 @@
 
     <div class="max-w-4xl mx-auto">
         <header class="bg-primary text-white p-6 rounded-xl shadow-lg mb-8">
-            <h1 class="text-3xl font-bold">🌐 Web Network Monitor</h1>
+            <h1 class="text-3xl font-bold">🌐 Mainstreet Capital Monitoring Dashboard</h1>
             <p class="text-indigo-200 mt-1">Real-time status check for Hosts/IPs without the command line.</p>
             <p class="text-xs text-indigo-300 mt-2">Note: This monitor checks for **web connectivity (HTTP/S response)**, not a pure ICMP ping, due to browser security restrictions.</p>
         </header>

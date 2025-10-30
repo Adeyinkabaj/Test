@@ -62,6 +62,9 @@
 google.com
 mainstreetcapltd.sharepoint.com
 mainstreetcapltd.com
+198.185.159.144
+198.185.159.144
+kuda.com
 mail.google.com
 mail.ubagroup.com/owa
 mybankone.com

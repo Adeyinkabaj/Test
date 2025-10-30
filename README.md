@@ -66,7 +66,7 @@ mainstreetcapltd.com
 198.185.159.144
 kuda.com
 mail.google.com
-mail.ubagroup.com/owa
+ubagroup.com
 mybankone.com
 github.com
 local-server

@@ -120,6 +120,14 @@ horilla.com
             logElement.scrollTop = logElement.scrollHeight;
         }
 
+        /**
+         * 🆕 NEW FUNCTION: Sanitizes the host string for use as a valid HTML element ID.
+         */
+        function sanitizeHostForId(host) {
+            // Replace dots, colons, and slashes with an underscore
+            return host.replace(/[\.\:\/]/g, '_');
+        }
+
         // The core pinging function, now using a promise chain to try HTTPS then HTTP
         function checkHost(host) {
             // Function to run the actual check using an Image object
@@ -165,3 +173,140 @@ horilla.com
                     if (httpsResult.status === 'Online') {
                         return { host: host, ...httpsResult };
                     }
+                    // If HTTPS failed (Offline or Timeout), try HTTP
+                    return runImageCheck('http', hostOnly)
+                        .then(httpResult => {
+                            // Return whichever result is best
+                            const status = httpResult.status === 'Online' ? 'Online' : 'Offline';
+                            // Update error message to clearly state both protocols failed if they did
+                            const errorMsg = httpResult.status === 'Online' ? '' : `Failed HTTPS & HTTP: ${httpResult.errorMsg}`;
+                            return { host: host, status, time: httpResult.time, errorMsg, scheme: httpResult.scheme };
+                        });
+                })
+                .catch(err => {
+                    return { host: host, status: 'Error', time: 0, errorMsg: `Fatal JS Error: ${err.message}`, scheme: 'N/A' };
+                });
+        }
+
+        /**
+         * CORRECTED FUNCTION: Processes the input list to check both www and non-www versions.
+         */
+        async function runCheck() {
+            const hostListText = document.getElementById('host-list').value;
+
+            // 1. Get the list of unique hosts entered by the user
+            const hosts = hostListText.split('\n')
+                .map(h => h.trim())
+                .filter(h => h.length > 0);
+
+            // 2. Generate a list of all URLs to check (www and non-www)
+            const urlsToCheck = [];
+            hosts.forEach(host => {
+                // Check if it's a domain (starts with letters) and not already a www.
+                if (host.match(/^[a-zA-Z]/) && !host.startsWith('www.')) {
+                    // The original host (naked domain)
+                    urlsToCheck.push(host);
+
+                    // The www version
+                    urlsToCheck.push("www." + host);
+                } else {
+                    // Keep IPs or 'www.' entries as is
+                    urlsToCheck.push(host);
+                }
+            });
+
+            // Remove any duplicates that might have been entered by the user
+            const finalHosts = [...new Set(urlsToCheck)];
+
+            if (finalHosts.length === 0) {
+                log("No hosts defined. Stopping check.", true);
+                stopMonitoring();
+                return;
+            }
+
+            log(`Starting check for ${finalHosts.length} URLs...`);
+
+            // 3. Create promises for all hosts/URLs
+            const promises = finalHosts.map(host => checkHost(host));
+            const results = await Promise.all(promises);
+
+            const now = new Date().toLocaleTimeString();
+
+            results.forEach(result => {
+                const { host, status, time, errorMsg, scheme } = result;
+                
+                // 4. Use the sanitized ID for the table update
+                updateStatusTable(host, status, time, now, errorMsg, scheme);
+
+                const detail = status === 'Online' ? `via ${scheme.toUpperCase()} in ${time.toFixed(2)}ms` : errorMsg;
+                log(`Checked ${host}: <span class="font-bold text-${status === 'Online' ? 'success' : 'danger'}-700">${status}</span> (${detail})`);
+            });
+            log(`Check cycle completed at ${now}.`, false);
+        }
+
+        /**
+         * CORRECTED FUNCTION: Uses the sanitized host ID for creating and retrieving table rows.
+         */
+        function updateStatusTable(host, status, time, timestamp, errorMsg, scheme) {
+            // Create the safe ID
+            const hostId = sanitizeHostForId(host);
+
+            // Use the safe ID for the row
+            let row = document.getElementById(`row-${hostId}`);
+            const isOnline = status === 'Online';
+            const statusColor = isOnline ? 'bg-success text-white' : 'bg-danger text-white';
+            const icon = isOnline ? '✅' : '❌';
+            const detailText = isOnline ? `${time.toFixed(0)} ms (${scheme.toUpperCase()})` : errorMsg;
+            const rowClass = isOnline ? 'hover:bg-green-50' : 'hover:bg-red-50';
+
+            if (!row) {
+                row = statusBody.insertRow();
+                row.id = `row-${hostId}`; // Set the safe ID
+                row.className = `transition duration-150 ease-in-out ${rowClass}`;
+            } else {
+                row.className = `transition duration-150 ease-in-out ${rowClass}`;
+            }
+
+            row.innerHTML = `
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${host}</td>
+                <td id="status-cell-${hostId}" class="px-6 py-4 whitespace-nowrap text-center">
+                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusColor}">${icon} ${status}</span>
+                    <div class="text-xs text-gray-500 mt-1">${detailText}</div>
+                </td>
+                <td id="time-cell-${hostId}" class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">${timestamp}</td>
+            `;
+        }
+
+        // Start/Stop Logic
+        function startMonitoring() {
+            const intervalSeconds = parseInt(document.getElementById('interval').value);
+            if (isNaN(intervalSeconds) || intervalSeconds < 1) {
+                log('Invalid interval. Please enter a number greater than 0.');
+                return;
+            }
+
+            document.getElementById('start-monitor').disabled = true;
+            document.getElementById('stop-monitor').disabled = false;
+            document.getElementById('host-list').disabled = true;
+
+            log(`Monitoring started. Refreshing every ${intervalSeconds} seconds.`, true);
+
+            // Run immediately and then set interval
+            runCheck();
+            monitoringInterval = setInterval(runCheck, intervalSeconds * 1000);
+        }
+
+        function stopMonitoring() {
+            if (monitoringInterval) {
+                clearInterval(monitoringInterval);
+                monitoringInterval = null;
+                log('Monitoring stopped.');
+            }
+
+            document.getElementById('start-monitor').disabled = false;
+            document.getElementById('stop-monitor').disabled = true;
+            document.getElementById('host-list').disabled = false;
+        }
+    </script>
+</body>
+</html>

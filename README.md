@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Web Network Monitor</title>
+    <title>Mainstreet Capital Monitoring Dashboard</title>
     <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Configure Tailwind for Inter font and custom colors -->
@@ -62,7 +62,6 @@
 google.com
 mainstreetcapltd.com
 198.185.159.144
-mainstreetcapitalportal.com
 ubagroup.com
 github.com
 horilla.com

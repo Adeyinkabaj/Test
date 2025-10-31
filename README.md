@@ -56,6 +56,7 @@
                     <textarea id="host-list" rows="5" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-secondary focus:border-secondary transition duration-150" placeholder="e.g., mainstreetcapltd.com&#10;google.com&#10;server-app.local">192.168.100.30
 google.com
 mainstreetcapltd.com
+mainstreetcapitalportal.com
 198.185.159.144
 ubagroup.com
 github.com
